@@ -87,8 +87,7 @@ If `--dry-run` is set, present what would happen and stop:
 
 - Create repo: <org>/<model-id> (public, from ersilia-os/eos-template)
 - Clone to: /tmp/ersilia-publish-<model-id>
-- Copy files from: <model-dir>
-- Update metadata.yml Identifier: eos0xxx → <model-id>
+- Copy files from: <model-dir> (ID already set in metadata.yml)
 - Create branch: incorporate/<model-id>
 - Open PR with test report summary for maintainer review
 - CI workflow test-model-pr.yml will run on the PR
@@ -288,7 +287,6 @@ gh pr checks --repo <org>/<model-id>
 
 - NEVER publish with a placeholder ID (`eos0xxx`, `eos0aaa`). Always require a real model ID.
 - Always check if the repo already exists before creating.
-- Always update the Identifier in metadata.yml to match the repo name.
 - Always include the test_report.json in the PR — it is the evidence of pre-publication testing.
 - If checkpoint files are large (>50MB), warn about Git LFS before pushing.
 - The `--dry-run` flag should be used first to preview what will happen.

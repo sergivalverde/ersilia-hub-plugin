@@ -195,8 +195,14 @@ Any, ADMET, Antimicrobial resistance, Malaria, Tuberculosis, COVID-19, Gonorrhea
 ### Publication Type
 Peer reviewed, Preprint, Other
 
+### Source
+Local, Online
+
 ### Source Type
 External, Replicated, Internal
+
+### Deployment
+Local, Online
 
 ### License
 MIT, GPL-3.0-only, GPL-3.0-or-later, LGPL-3.0-only, LGPL-3.0-or-later, AGPL-3.0-only, AGPL-3.0-or-later, Apache-2.0, BSD-2-Clause, BSD-3-Clause, MPL-2.0, CC-BY-3.0, CC-BY-4.0, CC0-1.0, Proprietary, None
