@@ -69,24 +69,36 @@ Report results for all pre-flight checks. If there are failures, ask the user wh
 
 ## Phase 2: Run ersilia test
 
-### 2a. Check ersilia is installed
+### 2a. Ensure ersilia is installed
+
+Check if ersilia is available:
 
 ```bash
 ersilia --version
 ```
 
-If ersilia is not installed, inform the user:
-```
-ersilia CLI is not installed. Install it with:
-  pip install ersilia
+If ersilia is NOT installed, install it automatically in the current Python environment:
 
-Or for testing capabilities:
-  pip install ersilia[test]
-
-Pre-flight checks passed, so the model structure is valid. Install ersilia to run the full test suite.
+```bash
+pip install ersilia[test]
 ```
 
-Stop here if ersilia is not available.
+If pip install fails (e.g., due to system Python restrictions), try with a virtual environment:
+
+```bash
+python3 -m venv /tmp/ersilia-test-env
+/tmp/ersilia-test-env/bin/pip install ersilia[test]
+```
+
+Then use `/tmp/ersilia-test-env/bin/ersilia` for all subsequent commands.
+
+Verify the installation succeeded:
+
+```bash
+ersilia --version
+```
+
+If installation still fails, report the error to the user and stop. Do NOT skip the ersilia test suite — it is a required part of validation.
 
 ### 2b. Run the test
 
