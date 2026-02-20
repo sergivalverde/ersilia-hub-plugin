@@ -8,7 +8,7 @@ A [Claude Code](https://claude.com/claude-code) plugin that automates the end-to
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                       /incorporate-model <url>                          │
 │                                                                         │
-│   Paper + Code ──> Analyze ──> Verify by ──> Assign ID ──> Generate    │
+│   Paper + Code ──> Analyze ──> Verify by ──> Assign ID ──> Generate     │
 │                     source      Running      (eos7k2f)    eos-template  │
 │                                  model                        |         │
 │                                                         Test & Report   │
