@@ -219,7 +219,7 @@ Use ONLY values from the valid vocabulary lists in the eos-template-knowledge sk
 
 ## Phase 5: Test and Generate Report
 
-This phase runs the same checks as `/test-model --level shallow` and saves a test report file in the model directory as evidence. This report is committed alongside the model files when published.
+This phase runs the same checks as `/test-model --level deep` and saves a test report file in the model directory as evidence. This report is committed alongside the model files when published.
 
 ### 5a. Run all inspect checks
 
@@ -269,7 +269,19 @@ Using the verification venv from Phase 2:
 
 If end-to-end validation fails, fix the generated code and re-run until it passes.
 
-### 5c. Generate test report
+### 5c. Run deep checks (scientific validation)
+
+Using the verification venv from Phase 2, run the three deep validation sub-checks as described in `/test-model` Phase 3. Follow the same procedures from the eos-template-knowledge skill reference data.
+
+**Distribution analysis**: Write the DIVERSE_50 set to a temp CSV, run main.py, compute per-column statistics (mean, std, min, max, coefficient of variation). Check completion rate >= 90%, non-constant outputs, all finite, runtime < 300s.
+
+**Sanity checks**: Resolve Tags + Biomedical Area to sanity categories using TAG_TO_SANITY_KEY. For each matched category, run positive and negative reference compounds, verify directional separation matches run_columns.csv direction. For Representation models, check cosine similarity of similar_pair > dissimilar_pair.
+
+**Paper reproduction** (only if `--paper` URL was provided): Fetch paper with WebFetch, extract reported metrics. Search source repo for test data. If found, run model on subset and compare metrics (20% tolerance = pass, 50% = warning). Paper reproduction never hard-fails.
+
+Collect all deep check results into a `deep_checks` dictionary.
+
+### 5d. Generate test report
 
 Write a `test_report.json` file in the model directory root (`<output-dir>/<model-id>/test_report.json`). This file serves as evidence that the model was tested before publication.
 
@@ -338,6 +350,49 @@ The report must contain:
       "identical": true
     }
   },
+  "deep_checks": {
+    "distribution_analysis": {
+      "status": "passed",
+      "num_input_molecules": 50,
+      "num_valid_outputs": <N>,
+      "completion_rate": <float>,
+      "runtime_seconds": <float>,
+      "columns": {
+        "<col_name>": {
+          "mean": <float>,
+          "std": <float>,
+          "min": <float>,
+          "max": <float>,
+          "coefficient_of_variation": <float>,
+          "is_constant": false,
+          "all_finite": true,
+          "status": "passed"
+        }
+      }
+    },
+    "sanity_checks": {
+      "status": "passed|warning|skipped",
+      "matched_categories": ["<category>"],
+      "checks": [
+        {
+          "category": "<category>",
+          "column": "<col_name>",
+          "direction": "high|low",
+          "positive_mean": <float>,
+          "negative_mean": <float>,
+          "separation_correct": true,
+          "status": "passed"
+        }
+      ]
+    },
+    "paper_reproduction": {
+      "status": "passed|warning|skipped",
+      "paper_url": "<url or null>",
+      "reported_metrics": [{"metric": "<name>", "value": <float>}],
+      "reproduced_metrics": [{"metric": "<name>", "value": <float>, "deviation_pct": <float>}],
+      "detail": "<explanation>"
+    }
+  },
   "verified_outputs": {
     "input_smiles": [
       "CC(=O)Oc1ccccc1C(=O)O",
@@ -355,14 +410,15 @@ The report must contain:
     "status": "passed",
     "total_checks": <N>,
     "passed": <N>,
+    "warnings": 0,
     "failed": 0
   }
 }
 ```
 
-### 5d. Report summary
+### 5e. Report summary
 
-Display a summary table to the user showing all check results, plus confirmation that `test_report.json` was generated. List all generated files with their paths and sizes.
+Display a summary table to the user showing all check results (inspect, shallow, and deep), plus confirmation that `test_report.json` was generated. List all generated files with their paths and sizes.
 
 ## Important Rules
 

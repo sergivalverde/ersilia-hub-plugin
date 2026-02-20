@@ -228,6 +228,14 @@ All checks were run locally using `ersilia-hub-plugin` before submission.
 | End-to-end run | ✅ passed | <output_rows> rows, <output_columns> columns |
 | Consistency | ✅ passed | Dual-run comparison identical |
 
+### Deep Validation (if deep_checks present in test_report.json)
+
+| Check | Status | Details |
+|-------|--------|---------|
+| Distribution analysis | ✅ passed | <num_valid_outputs>/<num_input_molecules> valid, CV=<cv> |
+| Sanity (<category>) | ✅ passed | <positive_mean> vs <negative_mean> (correct separation) |
+| Paper reproduction | ⚠️ skipped | <detail> |
+
 ### Verified Outputs (3 test molecules)
 
 | SMILES | Output (first 5 values...) |

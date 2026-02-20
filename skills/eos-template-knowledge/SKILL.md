@@ -244,3 +244,225 @@ score
 0.42
 0.13
 ```
+
+## Deep Validation Reference Data
+
+The following reference compounds and mappings are used by the `--level deep` test to validate that models produce scientifically meaningful outputs.
+
+### DIVERSE_50 — Chemical Space Coverage Set
+
+50 molecules spanning molecular weight, polarity, ring systems, and functional groups. Used for distribution analysis on all model types.
+
+```python
+DIVERSE_50 = [
+    "CC(=O)Oc1ccccc1C(=O)O",                          # aspirin
+    "CC(C)Cc1ccc(cc1)C(C)C(=O)O",                     # ibuprofen
+    "Cn1c(=O)c2c(ncn2C)n(c1=O)C",                     # caffeine
+    "CC(=O)Nc1ccc(O)cc1",                              # acetaminophen
+    "OC(=O)c1ccccc1O",                                 # salicylic acid
+    "c1ccc2c(c1)cc1ccc3cccc4ccc2c1c34",                # pyrene
+    "O=C(O)C(N)Cc1ccccc1",                             # phenylalanine
+    "CC12CCC3C(CCC4CC(=O)CCC34C)C1CCC2O",             # testosterone
+    "CN1C(=O)CN=C(c2ccccc2)c2cc(Cl)ccc21",            # diazepam
+    "CC(CS)C(=O)N1CCCC1C(=O)O",                       # captopril
+    "Clc1ccc(cc1)C(c1ccc(Cl)cc1)C(Cl)(Cl)Cl",        # DDT
+    "CC(C)NCC(O)c1ccc(O)c(O)c1",                      # isoprenaline
+    "OC[C@H]1OC(O)[C@H](O)[C@@H](O)[C@@H]1O",       # glucose
+    "c1ccc(cc1)-c1ccccc1",                             # biphenyl
+    "NCCc1c[nH]c2ccc(O)cc12",                         # serotonin
+    "CC(C)(C)NCC(O)c1ccc(O)c(CO)c1",                  # salbutamol
+    "OC(=O)c1cc(O)c(O)c(O)c1",                        # gallic acid
+    "O=c1[nH]c(=O)c2[nH]cnc2[nH]1",                  # uric acid
+    "FC(F)(F)c1ccc(cc1)S(=O)(=O)N",                   # trifluoromethylbenzenesulfonamide
+    "CC1=CC(=O)c2c(O)cccc2C1=O",                      # plumbagin
+    "c1ccc(-c2ccccn2)nc1",                             # bipyridine
+    "O=C(O)CCCCCCCCCCCCCCC",                           # palmitic acid
+    "CCCCCCCCCCCCCCCCCCCC",                            # eicosane
+    "c1ccc2[nH]ccc2c1",                               # indole
+    "O=Cc1ccc(O)c(OC)c1",                             # vanillin
+    "Nc1ccc(N)cc1",                                    # p-phenylenediamine
+    "ClC(Cl)=C(Cl)Cl",                                # tetrachloroethylene
+    "O=C(O)c1ccc(N)cc1",                              # 4-aminobenzoic acid
+    "CCOC(=O)c1ccccc1N",                              # benzocaine
+    "O=S(=O)(c1ccccc1)c1ccccc1",                      # diphenylsulfone
+    "c1ccncc1",                                        # pyridine
+    "c1cc[nH]c1",                                      # pyrrole
+    "c1ccoc1",                                         # furan
+    "c1ccsc1",                                         # thiophene
+    "NCCCCN",                                          # putrescine
+    "OC(=O)C=CC(=O)O",                                # fumaric acid
+    "CC(=O)NCCC1=CNC2=C1C=C(OC)C=C2",                # melatonin
+    "O=C(O)c1cccnc1",                                 # nicotinic acid
+    "CC1(C)SC2C(NC(=O)Cc3ccccc3)C(=O)N2C1C(=O)O",   # penicillin G
+    "OC1C(O)C(O)C(O)C(O)C1O",                        # inositol
+    "Nc1ncnc2[nH]cnc12",                              # adenine
+    "NCC(=O)O",                                        # glycine
+    "O=C(O)C(N)CC(=O)O",                              # aspartate
+    "OC(=O)c1cn(C2CC2)c2cc(N3CCNCC3)c(F)cc2c1=O",   # ciprofloxacin
+    "ClC(Cl)(Cl)Cl",                                   # carbon tetrachloride
+    "O",                                               # water
+    "CC(O)CC(=O)c1ccccc1",                            # benzoyacetone
+    "CC(=O)c1ccc(cc1)S(C)(=O)=O",                    # methylsulfonylphenone
+    "O=C(O)C(O)C(O)C(=O)O",                          # tartaric acid
+    "c1ccc(cc1)-c1ccc(cc1)-c1ccccc1",                 # terphenyl
+]
+```
+
+### SANITY_COMPOUNDS — Domain-Specific Reference Sets
+
+Compounds with known properties organized by domain. Each entry: `(SMILES, name)`. Positive = expected active/high; Negative = expected inactive/low.
+
+```python
+SANITY_COMPOUNDS = {
+    "antimicrobial": {
+        "positive": [
+            ("CC1(C)SC2C(NC(=O)Cc3ccccc3)C(=O)N2C1C(=O)O", "penicillin_G"),
+            ("OC(=O)c1cn(C2CC2)c2cc(N3CCNCC3)c(F)cc2c1=O", "ciprofloxacin"),
+            ("NC(=O)c1ccc(O)c(O)c1", "aminosalicylic_acid"),
+        ],
+        "negative": [
+            ("OC[C@H]1OC(O)[C@H](O)[C@@H](O)[C@@H]1O", "glucose"),
+            ("CCCCCCCCCCCCCCCCCCCC", "eicosane"),
+            ("O", "water"),
+        ]
+    },
+    "toxicity": {
+        "positive": [
+            ("Clc1ccc(cc1)C(c1ccc(Cl)cc1)C(Cl)(Cl)Cl", "DDT"),
+            ("O=[As](O)(O)O", "arsenate"),
+            ("ClC(Cl)(Cl)Cl", "carbon_tetrachloride"),
+        ],
+        "negative": [
+            ("OC[C@H]1OC(O)[C@H](O)[C@@H](O)[C@@H]1O", "glucose"),
+            ("O=C(O)C(N)CC(=O)O", "aspartate"),
+            ("O", "water"),
+        ]
+    },
+    "solubility": {
+        "high_soluble": [
+            ("OC[C@H]1OC(O)[C@H](O)[C@@H](O)[C@@H]1O", "glucose"),
+            ("O=C(O)C(N)CC(=O)O", "aspartate"),
+            ("NCC(=O)O", "glycine"),
+        ],
+        "low_soluble": [
+            ("c1ccc2c(c1)cc1ccc3cccc4ccc2c1c34", "pyrene"),
+            ("CCCCCCCCCCCCCCCCCCCC", "eicosane"),
+            ("c1ccc(cc1)-c1ccc(cc1)-c1ccccc1", "terphenyl"),
+        ]
+    },
+    "lipophilicity": {
+        "high_logp": [
+            ("CCCCCCCCCCCCCCCCCCCC", "eicosane"),
+            ("Clc1ccc(cc1)C(c1ccc(Cl)cc1)C(Cl)(Cl)Cl", "DDT"),
+            ("c1ccc2c(c1)cc1ccc3cccc4ccc2c1c34", "pyrene"),
+        ],
+        "low_logp": [
+            ("OC[C@H]1OC(O)[C@H](O)[C@@H](O)[C@@H]1O", "glucose"),
+            ("NCC(=O)O", "glycine"),
+            ("OC(=O)C(O)C(O)C(=O)O", "tartaric_acid"),
+        ]
+    },
+    "cardiotoxicity": {
+        "positive": [
+            ("CN1C(=O)CN=C(c2ccccc2)c2cc(Cl)ccc21", "diazepam"),
+            ("CC(CS)C(=O)N1CCCC1C(=O)O", "captopril"),
+        ],
+        "negative": [
+            ("CC(=O)Oc1ccccc1C(=O)O", "aspirin"),
+            ("CC(=O)Nc1ccc(O)cc1", "acetaminophen"),
+        ]
+    },
+    "fingerprint": {
+        "similar_pair": [
+            ("CC(=O)Oc1ccccc1C(=O)O", "aspirin"),
+            ("OC(=O)c1ccccc1O", "salicylic_acid"),
+        ],
+        "dissimilar_pair": [
+            ("CCCCCCCCCCCCCCCCCCCC", "eicosane"),
+            ("Nc1ncnc2[nH]cnc12", "adenine"),
+        ]
+    },
+    "malaria": {
+        "positive": [
+            ("CCN(CC)c1cc2nc3cc(Cl)ccc3c(N)c2cc1", "chloroquine_analog"),
+            ("OC(=O)c1cc(O)c(O)c(O)c1", "gallic_acid"),
+        ],
+        "negative": [
+            ("OC[C@H]1OC(O)[C@H](O)[C@@H](O)[C@@H]1O", "glucose"),
+            ("CCCCCCCCCCCCCCCCCCCC", "eicosane"),
+        ]
+    },
+}
+```
+
+### TAG_TO_SANITY_KEY — Metadata to Sanity Category Mapping
+
+Maps model Tags and Biomedical Areas to the appropriate sanity check category.
+
+```python
+TAG_TO_SANITY_KEY = {
+    "Antimicrobial activity": "antimicrobial",
+    "Antifungal activity": "antimicrobial",
+    "Antiviral activity": "antimicrobial",
+    "MIC90": "antimicrobial",
+    "IC50": "antimicrobial",
+    "Toxicity": "toxicity",
+    "Cytotoxicity": "toxicity",
+    "Cardiotoxicity": "cardiotoxicity",
+    "hERG": "cardiotoxicity",
+    "Solubility": "solubility",
+    "LogS": "solubility",
+    "ADME": "solubility",
+    "Lipophilicity": "lipophilicity",
+    "LogP": "lipophilicity",
+    "LogD": "lipophilicity",
+    "Fingerprint": "fingerprint",
+    "Embedding": "fingerprint",
+    "Descriptor": "fingerprint",
+    "Malaria": "malaria",
+    "P.falciparum": "malaria",
+}
+
+BIOMEDICAL_AREA_TO_SANITY_KEY = {
+    "Antimicrobial resistance": "antimicrobial",
+    "Malaria": "malaria",
+    "ADMET": "solubility",
+    "Cancer": "toxicity",
+}
+```
+
+**Resolution algorithm**:
+1. Iterate through model's `Tag` list, collect all matching sanity keys
+2. Iterate through `Biomedical Area` list, add any additional keys
+3. If `Task` is `Representation` and no keys matched, default to `"fingerprint"`
+4. If `Task` is `Sampling`, skip sanity checks (distribution analysis still runs)
+5. If no keys matched, skip sanity checks with WARNING status
+
+### Sanity Check Interpretation
+
+**For Annotation models** (Score/Value output):
+- Read `direction` from `run_columns.csv`
+- If direction is `high`: expect mean(positive) > mean(negative)
+- If direction is `low`: expect mean(positive) < mean(negative)
+- For multi-column output, check each column using its own direction
+
+**For Representation models** (fingerprints/embeddings):
+- Compute cosine similarity between vectors of the similar pair
+- Compute cosine similarity between vectors of the dissimilar pair
+- Expect: similarity(similar_pair) > similarity(dissimilar_pair)
+
+**For solubility/lipophilicity** (bidirectional):
+- Use `high_soluble`/`low_soluble` or `high_logp`/`low_logp` groups
+- Direction from run_columns.csv determines which group is "positive"
+
+### Pass/Fail Criteria
+
+| Check | PASS | WARNING | FAIL |
+|-------|------|---------|------|
+| Distribution: completeness | >= 90% valid | 70-90% | < 70% |
+| Distribution: non-constant | std > 1e-6 | — | All identical (std=0) |
+| Distribution: finite values | All finite | — | Any inf |
+| Distribution: runtime | < 300s for 50 molecules | 300-600s | > 600s |
+| Sanity: directional separation | Correct direction | Marginal (<10% diff) | Reversed |
+| Fingerprint: similarity | Similar > dissimilar | — | Reversed |
+| Paper: metric reproduction | Within 20% of reported | Within 50% or skipped | Never hard-fails |

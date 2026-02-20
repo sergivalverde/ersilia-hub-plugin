@@ -44,7 +44,7 @@ Takes a published ML model (from GitHub or Zenodo) and generates a complete eos-
 2. **Verify by Running** -- installs the model in an isolated venv and runs inference on test molecules to confirm output dimensions, types, and values
 3. **Assign Model ID & Present Analysis** -- generates a unique model ID (checks GitHub for collisions), presents the verified analysis and proposed metadata for user confirmation
 4. **Generate Files** -- creates the full eos-template directory structure with functional code and real example outputs
-5. **Test & Generate Report** -- runs inspect checks (file existence, metadata validation, column consistency, dependency pinning, syntax) and shallow checks (end-to-end run, output validation, consistency verification), then writes a `test_report.json` as evidence
+5. **Test & Generate Report** -- runs inspect checks (file existence, metadata validation, column consistency, dependency pinning, syntax), shallow checks (end-to-end run, output validation, consistency verification), and deep checks (distribution analysis on 50 diverse molecules, domain-specific sanity checks, paper reproduction when possible), then writes a `test_report.json` as evidence
 
 ### `/test-model`
 
@@ -52,6 +52,7 @@ Validates a locally generated model before publishing. Runs independently of the
 
 1. **Inspect checks** -- file existence (7 mandatory files), metadata validation against ersilia vocabulary, column consistency between `run_columns.csv` and `run_output.csv`, dependency pinning in `install.yml`, Python syntax validation of `main.py`
 2. **Shallow checks** -- end-to-end execution of `main.py` on example inputs, output validation (correct rows, columns, no invalid values), and consistency verification (dual-run comparison)
+3. **Deep checks** -- scientific validation: distribution analysis on 50 diverse molecules (output statistics, non-constant check, completion rate), domain-specific sanity checks (known active vs inactive compounds matched by model tags), and paper reproduction (metric comparison when test data available)
 
 ### `/publish-model`
 
@@ -121,7 +122,7 @@ Then enable the plugin by adding the following to your `~/.claude/settings.json`
 | Argument | Required | Description |
 |----------|----------|-------------|
 | `<model-dir>` | Yes | Path to the local eos-template model directory |
-| `--level <level>` | No | Test depth: `inspect` or `shallow` (default) |
+| `--level <level>` | No | Test depth: `inspect`, `shallow` (default), or `deep` |
 
 #### `/publish-model`
 
@@ -163,6 +164,11 @@ The report contains:
     "end_to_end_run": { "status": "passed", "exit_code": 0, "output_rows": 3, "output_columns": 39, "values_match_expected": true, "no_invalid_values": true },
     "consistency":    { "status": "passed", "method": "dual_run_comparison", "identical": true }
   },
+  "deep_checks": {
+    "distribution_analysis": { "status": "passed", "num_input_molecules": 50, "num_valid_outputs": 48, "completion_rate": 0.96, "runtime_seconds": 42.3, "columns": { "...": "..." } },
+    "sanity_checks":         { "status": "passed", "matched_categories": ["fingerprint"], "checks": [{ "category": "fingerprint", "status": "passed" }] },
+    "paper_reproduction":    { "status": "skipped", "detail": "no test data found" }
+  },
   "verified_outputs": {
     "input_smiles": ["CC(=O)Oc1ccccc1C(=O)O", "..."],
     "output_values": [[0, 0, "..."], ["..."]],
@@ -170,8 +176,9 @@ The report contains:
   },
   "overall": {
     "status": "passed",
-    "total_checks": 7,
-    "passed": 7,
+    "total_checks": 10,
+    "passed": 9,
+    "warnings": 1,
     "failed": 0
   }
 }
@@ -184,8 +191,9 @@ The report contains:
 | `verification_environment` | Exact package versions used during testing (from `pip freeze`) |
 | `inspect_checks` | Static validation results: file existence, metadata against ersilia vocabulary, column consistency, dependency pinning, syntax |
 | `shallow_checks` | Runtime validation: end-to-end `main.py` execution and dual-run consistency comparison |
+| `deep_checks` | Scientific validation: distribution analysis on 50 diverse molecules, domain-specific sanity checks, paper metric reproduction |
 | `verified_outputs` | Actual model outputs on the 3 test molecules (aspirin, ibuprofen, caffeine), used as ground truth |
-| `overall` | Aggregate pass/fail status and check counts |
+| `overall` | Aggregate pass/fail/warning status and check counts |
 
 ### Using the knowledge base
 

@@ -1,6 +1,6 @@
 ---
 description: Run local tests on an eos-template model before publishing
-argument-hint: <model-dir> [--level inspect|shallow]
+argument-hint: <model-dir> [--level inspect|shallow|deep]
 allowed-tools: [Bash, Read, Glob, Grep, Task, TodoWrite, AskUserQuestion]
 ---
 
@@ -14,7 +14,7 @@ This command reimplements the relevant checks from `ersilia test` directly, with
 
 From the user's input, extract:
 - `model-dir` (required): Path to the local eos-template model directory (e.g., `./eos0xxx`)
-- `--level <level>` (optional): Test depth. `inspect` (metadata + files only) or `shallow` (inspect + end-to-end run). Default: `shallow`
+- `--level <level>` (optional): Test depth. `inspect` (metadata + files only), `shallow` (inspect + end-to-end run), or `deep` (shallow + scientific validation). Default: `shallow`
 
 ## Phase 1: Inspect Checks
 
@@ -159,7 +159,167 @@ Compare both outputs:
 rm -rf /tmp/ersilia-test-<model-id> /tmp/ersilia-test-output-<model-id>*.csv
 ```
 
-## Phase 3: Report
+## Phase 3: Deep Checks (scientific validation)
+
+Only run if `--level deep`. Uses the same venv from Phase 2 (do not clean up yet).
+
+### 3a. Load metadata for routing
+
+Read `metadata.yml` to get Task, Tags, Biomedical Area, Output type, Output Dimension.
+Read `run_columns.csv` to get column names, types, and directions.
+
+### 3b. Distribution analysis (all model types)
+
+Write the DIVERSE_50 SMILES list (from the eos-template-knowledge skill) to a temp CSV:
+
+```bash
+# Write 50 diverse SMILES to temp input file
+python3 -c "
+smiles = [<DIVERSE_50 list from skill>]
+with open('/tmp/deep-diverse-input-<model-id>.csv', 'w') as f:
+    f.write('smiles\n')
+    for s in smiles:
+        f.write(s + '\n')
+"
+```
+
+Run main.py on the diverse set and measure runtime:
+
+```bash
+time /tmp/ersilia-test-<model-id>/bin/python3 <model-dir>/model/framework/code/main.py \
+    /tmp/deep-diverse-input-<model-id>.csv \
+    /tmp/deep-diverse-output-<model-id>.csv
+```
+
+Parse the output and compute statistics per column:
+
+```python
+import csv, math
+
+# For each numeric column, compute:
+stats = {
+    "count_valid": 0,       # non-null, non-NaN values
+    "count_null": 0,        # null/NaN/empty values
+    "mean": 0.0,
+    "std": 0.0,
+    "min": 0.0,
+    "max": 0.0,
+    "coefficient_of_variation": 0.0,  # std/mean if mean != 0
+    "is_constant": False,   # True if std == 0
+    "all_finite": True,     # False if any inf
+}
+```
+
+**Check criteria**:
+
+| Check | PASS | WARNING | FAIL |
+|-------|------|---------|------|
+| Completion rate | >= 45/50 (90%) | 35-44/50 (70-88%) | < 35/50 (< 70%) |
+| Non-constant | std > 1e-6 for each column | — | Any column has std = 0 |
+| Finite values | All finite | — | Any inf value |
+| Runtime | < 300 seconds | 300-600 seconds | > 600 seconds |
+
+**Additional checks by model type**:
+
+For **Representation** models (fingerprints/embeddings):
+- Count how many columns have std > 0 across the 50 molecules
+- PASS if > 50% of columns vary; WARNING if 10-50%; FAIL if < 10%
+
+For **Sampling** models (compound generation output):
+- Parse each output value as SMILES using a regex heuristic (contains at least one of: `C`, `c`, `N`, `n`, `O`, `o` and no spaces)
+- PASS if >= 80% parse; WARNING if 50-80%; FAIL if < 50%
+- Check diversity: count unique output strings, PASS if >= 50% unique
+
+### 3c. Sanity checks (Annotation and Representation models only)
+
+Resolve the model's Tags and Biomedical Area to sanity categories using the TAG_TO_SANITY_KEY and BIOMEDICAL_AREA_TO_SANITY_KEY mappings from the eos-template-knowledge skill.
+
+If Task is `Sampling`, skip sanity checks.
+If no categories matched and Task is `Representation`, default to `"fingerprint"`.
+If no categories matched at all, skip with WARNING status.
+
+For each matched sanity category:
+
+**For Annotation models** (Output is Score or Value):
+
+1. Write positive compounds to a temp CSV, run main.py, compute mean per output column
+2. Write negative compounds to a temp CSV, run main.py, compute mean per output column
+3. For each column, read `direction` from `run_columns.csv`:
+   - If direction is `high`: check mean(positive) > mean(negative)
+   - If direction is `low`: check mean(positive) < mean(negative)
+   - If no direction: skip this column
+4. PASS if separation is correct; WARNING if difference < 10% of range; FAIL if reversed
+
+For solubility/lipophilicity, use `high_soluble`/`low_soluble` or `high_logp`/`low_logp` as the two groups. Map to positive/negative based on the column's direction.
+
+**For Representation models** (fingerprints/embeddings):
+
+1. Run the `similar_pair` compounds (aspirin + salicylic acid) through main.py
+2. Run the `dissimilar_pair` compounds (eicosane + adenine) through main.py
+3. Compute cosine similarity between the two output vectors in each pair:
+   ```python
+   import math
+   def cosine_sim(a, b):
+       dot = sum(x*y for x,y in zip(a,b))
+       norm_a = math.sqrt(sum(x*x for x in a))
+       norm_b = math.sqrt(sum(x*x for x in b))
+       if norm_a == 0 or norm_b == 0:
+           return 0.0
+       return dot / (norm_a * norm_b)
+   ```
+4. PASS if similarity(similar_pair) > similarity(dissimilar_pair); FAIL if reversed
+
+### 3d. Paper reproduction (when Publication URL is available)
+
+Read `Publication` from `metadata.yml`. If empty or null, skip with status `"skipped"`.
+
+**Step 1 — Fetch the paper**:
+
+Use WebFetch to extract structured information from the paper URL:
+
+```
+Prompt: "Extract from this scientific paper in JSON format:
+{
+  \"model_type\": \"classification or regression or generation or embedding\",
+  \"reported_metrics\": [{\"metric_name\": \"...\", \"value\": ..., \"dataset\": \"...\"}],
+  \"test_smiles_mentioned\": [\"SMILES1\", ...],
+  \"key_finding\": \"one sentence summary\"
+}
+If a field cannot be determined, set it to null."
+```
+
+**Step 2 — Look for test data**:
+
+If `Source Code` URL points to a GitHub repo:
+1. Check if the source repo was already cloned at `/tmp/ersilia-source-*`
+2. Search for CSV/SDF files containing SMILES in `test/`, `data/`, `examples/` directories
+3. If found, extract up to 30 SMILES with their labels (if labeled)
+
+**Step 3 — Run and compare** (only if test data with labels was found):
+
+1. Write test SMILES to temp CSV
+2. Run main.py
+3. Compute the same metric the paper reports (AUC for classification, RMSE/R² for regression)
+4. Compare: within 20% relative deviation = PASS; within 50% = WARNING; else WARNING (never FAIL)
+
+**Paper reproduction never produces a hard FAIL** — the eos-template wrapping may legitimately differ from the paper's exact evaluation pipeline.
+
+| Condition | Status |
+|-----------|--------|
+| Metric reproduced within 20% | passed |
+| Metric reproduced within 50% | warning |
+| Metric deviation > 50% | warning |
+| No paper URL | skipped |
+| Paper fetched but no metrics found | skipped |
+| No test data available | skipped |
+
+After all deep checks, if `--level deep` was requested, now clean up the venv:
+
+```bash
+rm -rf /tmp/ersilia-test-<model-id> /tmp/ersilia-test-output-<model-id>*.csv /tmp/deep-*.csv
+```
+
+## Phase 4: Report
 
 Present all results in a clear summary:
 
@@ -189,10 +349,20 @@ Present all results in a clear summary:
 | Output values | PASS | match run_output.csv |
 | Consistency | PASS | identical on re-run |
 
-Overall: PASS (X/Y checks passed)
+### Deep Checks (if --level deep)
+| Check | Result | Details |
+|-------|--------|---------|
+| Distribution: completeness | PASS | 48/50 valid outputs |
+| Distribution: non-constant | PASS | all columns vary |
+| Distribution: runtime | PASS | 42s for 50 molecules |
+| Sanity (fingerprint) | PASS | similar pair cosine > dissimilar |
+| Paper reproduction | SKIPPED | no test data found |
+
+Overall: PASS (X/Y checks passed, W warnings)
 ```
 
 For any failed checks, explain what went wrong and suggest fixes.
+For warnings (especially from paper reproduction), explain what was checked and why it was inconclusive.
 
 ## Important Rules
 
