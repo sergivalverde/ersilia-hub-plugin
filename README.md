@@ -68,17 +68,17 @@ Then enable the plugin by adding the following to your `~/.claude/settings.json`
 ### Full workflow example
 
 ```bash
-# 1. Generate eos-template files from a published model
+# 1. Generate eos-template files from a published model (auto-assigns a unique model ID)
 /incorporate-model https://github.com/author/model-repo --paper https://doi.org/10.1234/paper
 
-# 2. Test locally before publishing
-/test-model ./eos0xxx
+# 2. Test locally before publishing (optional, /incorporate-model already tests)
+/test-model ./eos7k2f
 
 # 3. Preview what publishing will do
-/publish-model eos4abc ./eos0xxx --dry-run
+/publish-model ./eos7k2f --dry-run
 
-# 4. Publish to ersilia-os
-/publish-model eos4abc ./eos0xxx
+# 4. Publish to ersilia-os (opens a PR for maintainer review)
+/publish-model ./eos7k2f
 ```
 
 ### Command reference
@@ -89,7 +89,7 @@ Then enable the plugin by adding the following to your `~/.claude/settings.json`
 |----------|----------|-------------|
 | `<repo-url>` | Yes | GitHub or Zenodo URL of the source model |
 | `--paper <url>` | No | URL of the associated publication |
-| `--model-id <id>` | No | Ersilia model identifier (eosXXXX format). Defaults to `eos0xxx` |
+| `--model-id <id>` | No | Ersilia model identifier (eosXXXX format). Auto-generated if not provided |
 | `--output-dir <path>` | No | Where to create the model directory. Defaults to current working directory |
 
 #### `/test-model`
@@ -103,8 +103,7 @@ Then enable the plugin by adding the following to your `~/.claude/settings.json`
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `<model-id>` | Yes | Assigned Ersilia model ID (eosXXXX format) |
-| `<model-dir>` | Yes | Path to the local model directory to publish |
+| `<model-dir>` | Yes | Path to the local model directory to publish (ID read from metadata.yml) |
 | `--org <org>` | No | GitHub organization. Defaults to `ersilia-os` |
 | `--dry-run` | No | Preview actions without making changes |
 

@@ -13,8 +13,10 @@ You are incorporating a machine learning model into the Ersilia Model Hub by wra
 From the user's input, extract:
 - `repo-url` (required): GitHub URL or Zenodo URL of the source model
 - `--paper <url>` (optional): URL of the associated publication
-- `--model-id <id>` (optional): Ersilia model identifier (eosXXXX format). Default: `eos0xxx`
+- `--model-id <id>` (optional): Ersilia model identifier (eosXXXX format). If not provided, a unique ID will be generated automatically in Phase 3
 - `--output-dir <path>` (optional): Where to create the model directory. Default: current working directory
+
+During Phases 1 and 2, use a temporary working name (e.g., the repo name) for directories. The final model ID is assigned in Phase 3.
 
 ## Phase 1: Clone and Analyze
 
@@ -94,13 +96,50 @@ Save the actual outputs from the test run. These will be used as the ground-trut
 - **If inference fails**: check for missing dependencies, incorrect entry points, or version incompatibilities. Try to fix and re-run. If it cannot be resolved, report the error to the user and stop.
 - **If outputs differ from analysis**: update your analysis to match the verified results. The running code is always the source of truth.
 
-## Phase 3: Present Verified Analysis
+## Phase 3: Assign Model ID and Present Verified Analysis
+
+### 3a. Generate or confirm the model ID
+
+If the user provided `--model-id`, use that ID. Otherwise, generate a unique one:
+
+```bash
+python3 -c "
+import json, random, string, subprocess, os
+
+def encode():
+    result = 'eos'
+    result += random.choice('123456789')
+    result += ''.join(random.choice(string.ascii_lowercase + '0123456789') for _ in range(3))
+    return result
+
+def exists(model_id):
+    try:
+        output = subprocess.check_output(
+            ['gh', 'api', f'repos/ersilia-os/{model_id}', '--jq', '.name'],
+            stderr=open(os.devnull, 'w')
+        )
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+while True:
+    model_id = encode()
+    if not exists(model_id):
+        print(model_id)
+        break
+"
+```
+
+This generates a random ID matching `eos[1-9][a-z0-9]{3}` and verifies it doesn't already exist as a repo under `ersilia-os`.
+
+### 3b. Present verified analysis with the assigned ID
 
 Present your **verified** analysis to the user, clearly marking what was confirmed by execution:
 
 ```
 ## Verified Model Analysis
 
+**Model ID**: <generated-or-provided-id>
 **What it does**: [one paragraph]
 **ML Framework**: [framework name]
 **Input**: [format description]
@@ -132,9 +171,9 @@ Present your **verified** analysis to the user, clearly marking what was confirm
 | ... | float/integer/string | high/low/ | ... |
 ```
 
-Then ask the user: "This analysis has been verified by running the model. Should I proceed with generating the eos-template files, or would you like to adjust anything?"
+Then ask the user: "This analysis has been verified by running the model. The assigned model ID is `<model-id>`. Should I proceed with generating the eos-template files, or would you like to adjust anything (including the model ID)?"
 
-Wait for confirmation before proceeding.
+Wait for confirmation before proceeding. If the user wants a different ID, re-validate that it matches `eos[1-9][a-z0-9]{3}` and doesn't exist on GitHub.
 
 ## Phase 4: Generate Files
 

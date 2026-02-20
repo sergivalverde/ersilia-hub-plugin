@@ -1,6 +1,6 @@
 ---
 description: Create an ersilia-os repo from eos-template and open a PR with the model files
-argument-hint: <model-id> <model-dir> [--org <org>] [--dry-run]
+argument-hint: <model-dir> [--org <org>] [--dry-run]
 allowed-tools: [Bash, Read, Write, Edit, Glob, Grep, Task, AskUserQuestion, TodoWrite]
 ---
 
@@ -11,14 +11,23 @@ You are creating a new repository under the ersilia-os GitHub organization from 
 ## Parse Arguments
 
 From the user's input, extract:
-- `model-id` (required): The assigned Ersilia model identifier (eosXXXX format, e.g., `eos4abc`). Must NOT be `eos0xxx` or `eos0aaa` (these are reserved for testing/template).
-- `model-dir` (required): Path to the local directory containing the generated eos-template files (e.g., `./eos0xxx`)
+- `model-dir` (required): Path to the local directory containing the generated eos-template files (e.g., `./eos7k2f`)
 - `--org <org>` (optional): GitHub organization. Default: `ersilia-os`
 - `--dry-run` (optional): If set, show what would happen without creating the repo or pushing
 
+The model ID is read from the `Identifier` field in `<model-dir>/metadata.yml`. It was assigned during `/incorporate-model`.
+
 ## Phase 1: Pre-publish Validation
 
-### 1a. Verify the local model is ready
+### 1a. Read the model ID from metadata
+
+```bash
+python3 -c "import yaml; print(yaml.safe_load(open('<model-dir>/metadata.yml'))['Identifier'])"
+```
+
+This is the `model-id` used throughout the rest of the process. If the Identifier is `eos0xxx` or `eos0aaa`, stop and tell the user to re-run `/incorporate-model` to get a real model ID assigned.
+
+### 1b. Verify the local model is ready
 
 Check that all 7 mandatory files exist in `<model-dir>`:
 ```
@@ -33,7 +42,7 @@ metadata.yml
 
 If any are missing, stop and tell the user to run `/incorporate-model` first.
 
-### 1b. Verify test report exists
+### 1c. Verify test report exists
 
 Check that `<model-dir>/test_report.json` exists and that all checks passed:
 
@@ -49,9 +58,9 @@ print(f'Passed: {report[\"overall\"][\"passed\"]}/{report[\"overall\"][\"total_c
 
 If the test report is missing or has failures, stop and tell the user to run `/test-model` or `/incorporate-model` first.
 
-### 1c. Verify the model ID
+### 1d. Verify the model ID on GitHub
 
-1. Confirm `model-id` matches the pattern `eos[1-9][a-z0-9]{3}` (production IDs). Warn if it uses `eos0` prefix (test/placeholder range).
+1. Confirm `model-id` matches the pattern `eos[1-9][a-z0-9]{3}` (production IDs).
 2. Check if the repo `<org>/<model-id>` already exists:
    ```bash
    gh repo view <org>/<model-id> --json name 2>/dev/null
@@ -61,7 +70,7 @@ If the test report is missing or has failures, stop and tell the user to run `/t
    - Choose a different model ID
    - Abort
 
-### 1d. Verify GitHub permissions
+### 1e. Verify GitHub permissions
 
 ```bash
 gh auth status
@@ -69,7 +78,7 @@ gh auth status
 
 Confirm the authenticated user has permission to create repos under the target org. If not, inform the user and stop.
 
-### 1e. Dry run summary
+### 1f. Dry run summary
 
 If `--dry-run` is set, present what would happen and stop:
 
@@ -140,13 +149,7 @@ If there are checkpoint files in `<model-dir>/model/checkpoints/`, copy those to
 cp -r <model-dir>/model/checkpoints/* <model-id>/model/checkpoints/
 ```
 
-### 3c. Update the model identifier
-
-Update `metadata.yml` to replace the placeholder identifier with the real one:
-- Change `Identifier: eos0xxx` (or whatever placeholder) to `Identifier: <model-id>`
-- Change `Slug:` if it contains placeholder text
-
-### 3d. Check for large files
+### 3c. Check for large files
 
 Check if any files exceed GitHub's 100MB limit:
 ```bash
