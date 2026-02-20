@@ -1,38 +1,49 @@
 # ersilia-hub-plugin
 
-A [Claude Code](https://claude.com/claude-code) plugin that automates the incorporation of published ML models into the [Ersilia Model Hub](https://ersilia.io) by wrapping them in the standardized eos-template format.
+A [Claude Code](https://claude.com/claude-code) plugin that automates the end-to-end incorporation of published ML models into the [Ersilia Model Hub](https://ersilia.io) -- from source code analysis to repository creation.
 
 ## What it does
 
-This plugin provides two components:
+This plugin provides three commands and a knowledge base that cover the full model incorporation workflow:
 
-### `/incorporate-model` command
+```
+/incorporate-model <url>    →  analyze source, verify by running, generate eos-template files
+/test-model <model-dir>     →  validate files and run ersilia test locally
+/publish-model <id> <dir>   →  create repo under ersilia-os, push, trigger CI
+```
 
-An interactive command that takes a published ML model (from GitHub or Zenodo) and generates a complete eos-template model repository, including:
+### `/incorporate-model`
 
-- A functional `main.py` wrapper (CSV-in / CSV-out)
-- `run.sh` entry point
-- `install.yml` with pinned dependencies
-- `metadata.yml` with validated vocabulary
-- Example input/output files
-- Output column definitions
-
-The command runs through four phases:
+Takes a published ML model (from GitHub or Zenodo) and generates a complete eos-template model directory. Runs through five phases:
 
 1. **Clone & Analyze** -- clones the source repo, identifies the ML framework, dependencies, inference entry point, and input/output formats
-2. **Plan & Confirm** -- presents the analysis and proposed metadata for your approval before generating anything
-3. **Generate Files** -- creates the full eos-template directory structure with functional (not placeholder) code
-4. **Validate** -- verifies all required files exist and are syntactically valid
+2. **Verify by Running** -- installs the model in an isolated venv and runs inference on test molecules to confirm output dimensions, types, and values
+3. **Present Verified Analysis** -- presents the analysis (confirmed by execution) and proposed metadata
+4. **Generate Files** -- creates the full eos-template directory structure with functional code and real example outputs
+5. **Validate** -- static checks plus end-to-end validation of the generated `main.py`
+
+### `/test-model`
+
+Validates a locally generated model before publishing. Two levels of testing:
+
+1. **Pre-flight checks** (no ersilia required) -- verifies file existence, metadata vocabulary, column consistency, and Python syntax
+2. **ersilia test** (requires ersilia CLI) -- runs the full test suite (`--inspect`, `--surface`, `--shallow`, or `--deep`) using `--from_dir`
+
+### `/publish-model`
+
+Creates a new repository under `ersilia-os` from the `eos-template` and pushes the generated files:
+
+1. **Pre-publish validation** -- checks files, model ID format, GitHub permissions, and whether the repo already exists
+2. **Create repository** -- uses `gh repo create --template ersilia-os/eos-template`
+3. **Populate** -- copies generated files, updates the model identifier, checks for large files
+4. **Push** -- commits and pushes to `main`, triggering CI workflows (S3 upload, Docker build)
+5. **Post-publish** -- verifies push, checks CI status, reports next steps
+
+Supports `--dry-run` to preview without making changes.
 
 ### `eos-template-knowledge` skill
 
-A knowledge base that Claude Code can reference whenever you're working with eos-template repositories. It covers:
-
-- Repository structure and file conventions
-- The `main.py` contract and common inference patterns
-- `install.yml` and `metadata.yml` formats
-- Valid metadata vocabulary (tasks, tags, biomedical areas, organisms, licenses, etc.)
-- Column definitions and example file formats
+A knowledge base that Claude Code references automatically when working with eos-template repositories. Covers repository structure, the `main.py` contract, `install.yml` and `metadata.yml` formats, valid metadata vocabulary, and example file formats.
 
 ## Installation
 
@@ -54,19 +65,25 @@ Then enable the plugin by adding the following to your `~/.claude/settings.json`
 
 ## Usage
 
-### Incorporating a model
+### Full workflow example
 
-In Claude Code, run:
+```bash
+# 1. Generate eos-template files from a published model
+/incorporate-model https://github.com/author/model-repo --paper https://doi.org/10.1234/paper
 
-```
-/incorporate-model https://github.com/author/model-repo
+# 2. Test locally before publishing
+/test-model ./eos0xxx
+
+# 3. Preview what publishing will do
+/publish-model eos4abc ./eos0xxx --dry-run
+
+# 4. Publish to ersilia-os
+/publish-model eos4abc ./eos0xxx
 ```
 
-With optional flags:
+### Command reference
 
-```
-/incorporate-model https://github.com/author/model-repo --paper https://doi.org/10.1234/paper --model-id eos4e40 --output-dir ./models
-```
+#### `/incorporate-model`
 
 | Argument | Required | Description |
 |----------|----------|-------------|
@@ -75,9 +92,25 @@ With optional flags:
 | `--model-id <id>` | No | Ersilia model identifier (eosXXXX format). Defaults to `eos0xxx` |
 | `--output-dir <path>` | No | Where to create the model directory. Defaults to current working directory |
 
+#### `/test-model`
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `<model-dir>` | Yes | Path to the local eos-template model directory |
+| `--level <level>` | No | Test depth: `inspect`, `surface`, `shallow` (default), or `deep` |
+
+#### `/publish-model`
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `<model-id>` | Yes | Assigned Ersilia model ID (eosXXXX format) |
+| `<model-dir>` | Yes | Path to the local model directory to publish |
+| `--org <org>` | No | GitHub organization. Defaults to `ersilia-os` |
+| `--dry-run` | No | Preview actions without making changes |
+
 ### Using the knowledge base
 
-The eos-template-knowledge skill activates automatically when you ask Claude Code about incorporating models, the eos-template format, or when working inside an eosXXXX repository. You can also reference it directly by asking about any aspect of the eos-template structure.
+The eos-template-knowledge skill activates automatically when you ask Claude Code about incorporating models, the eos-template format, or when working inside an eosXXXX repository.
 
 ## Configuration
 
@@ -95,8 +128,6 @@ The plugin is configured via the `enabledPlugins` key in `~/.claude/settings.jso
 
 ### Permissions
 
-The `/incorporate-model` command uses the following tools: `Bash`, `Read`, `Write`, `Edit`, `Glob`, `Grep`, `WebFetch`, `Task`, `AskUserQuestion`, and `TodoWrite`. Claude Code will prompt you for approval on any tool calls that aren't already allowed in your permission settings.
-
 For a smoother experience, you can pre-allow common operations in your project's `.claude/settings.local.json`:
 
 ```json
@@ -104,8 +135,13 @@ For a smoother experience, you can pre-allow common operations in your project's
   "permissions": {
     "allow": [
       "Bash(git clone:*)",
-      "Bash(python -c:*)",
-      "Bash(curl:*)"
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(python3:*)",
+      "Bash(gh repo create:*)",
+      "Bash(gh repo view:*)",
+      "Bash(gh run list:*)",
+      "Bash(ersilia:*)"
     ]
   }
 }
@@ -114,8 +150,10 @@ For a smoother experience, you can pre-allow common operations in your project's
 ## Requirements
 
 - [Claude Code](https://claude.com/claude-code) CLI
-- Git (for cloning source repositories)
-- Python (for validating generated files)
+- Git
+- Python 3.9+
+- [GitHub CLI](https://cli.github.com/) (`gh`) -- for `/publish-model`
+- [Ersilia CLI](https://github.com/ersilia-os/ersilia) -- for `/test-model` full test suite (pre-flight checks work without it)
 
 ## License
 
