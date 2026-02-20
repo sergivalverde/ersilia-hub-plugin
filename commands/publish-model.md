@@ -89,6 +89,7 @@ If `--dry-run` is set, present what would happen and stop:
 - Clone to: /tmp/ersilia-publish-<model-id>
 - Copy files from: <model-dir> (ID already set in metadata.yml)
 - Create branch: incorporate/<model-id>
+- Generate model-specific README.md
 - Open PR with test report summary for maintainer review
 - CI workflow test-model-pr.yml will run on the PR
 
@@ -164,9 +165,85 @@ If large files are found, warn the user about Git LFS requirements. Files over 1
 - Setting up Git LFS: `git lfs track "model/checkpoints/*.pt"`
 - Or hosting checkpoints externally and downloading in `install.yml`
 
-## Phase 4: Commit, Push, and Open PR
+## Phase 4: Generate README
 
-### 4a. Stage and commit
+Replace the template `README.md` with a model-specific README built from `metadata.yml`, `test_report.json`, and `install.yml`. Write the generated content to `<model-id>/README.md`, overwriting the template default.
+
+### README template
+
+````markdown
+# <Title from metadata.yml>
+
+**Ersilia Model ID:** `<model-id>`
+
+| | |
+|---|---|
+| **Task** | <Task from metadata.yml> |
+| **Input** | <Input type and dimension> |
+| **Output** | <Output type and dimension> |
+| **Framework** | <Framework name and version from install.yml> |
+| **License** | <License from metadata.yml> |
+
+## Description
+
+<Description from metadata.yml — full text>
+
+## Interpretation
+
+<Interpretation from metadata.yml — full text>
+
+## Source
+
+- **Publication:** [<Author et al., Journal Year>](<Publication URL>)
+- **Source Code:** <Source Code URL>
+
+## Deep Validation
+
+| Check | Status | Details |
+|-------|--------|---------|
+<For each check in test_report.json, one row with check name, PASS/WARNING/FAIL, and key metrics>
+
+**Overall: <STATUS> (<N>/<total>)**
+
+### Highlights
+
+<Write 2-4 bullet points summarizing the key validation findings:>
+<- Distribution analysis: N molecules, runtime, completion rate, key stats>
+<- Sanity check: what was compared, separation magnitude and direction>
+<- Paper reproduction: what was validated, how results compare>
+<- Any warnings or notable findings>
+
+See [`deep_validation.ipynb`](deep_validation.ipynb) for full analysis with visualizations.
+
+## Usage
+
+```python
+# Input CSV format
+# <show the expected header and 2 example rows from run_input.csv>
+
+python model/framework/code/main.py input.csv output.csv
+```
+
+## Dependencies
+
+```yaml
+<Contents of install.yml>
+```
+````
+
+### Field extraction rules
+
+- **Task**: From `metadata.yml` Task field. If Subtask exists, show as "Task / Subtask"
+- **Input**: From Input + Input Dimension + Input Shape. Examples: "Single SMILES", "Compound pair (two SMILES)"
+- **Output**: From Output Type + Output Dimension + Interpretation. Examples: "39-dimensional integer count vector", "4 log10-transformed ADME scores", "Score between 0 and 1"
+- **Framework**: Infer from `install.yml` — the primary ML package and its version (e.g., "biosynfoni v1.0.0", "Chemprop v2.1.0", "PyTorch MLP on ECFP4 fingerprints")
+- **Publication link text**: Use "Author et al., Journal Year" format. Extract first author surname and year from the URL or metadata
+- **Deep Validation table**: Iterate over `test_report.json` → `deep_checks` keys. For each sub-check, extract status and the most important metric (e.g., completion rate, separation magnitude, similarity ratio)
+- **Highlights**: Write in plain scientific language. Include specific numbers. Reference the paper's claim and how the model's behavior validates it
+
+## Phase 5: Commit, Push, and Open PR
+
+### 5a. Stage and commit
 
 ```bash
 cd <model-id>
@@ -178,20 +255,20 @@ Automated incorporation via ersilia-hub-plugin.
 - Paper: <publication-url from metadata.yml>"
 ```
 
-### 4b. Push the branch
+### 5b. Push the branch
 
 ```bash
 git push -u origin incorporate/<model-id>
 ```
 
-### 4c. Build the PR body from the test report
+### 5c. Build the PR body from the test report
 
 Read the `test_report.json` and build a PR description that includes:
 - Model summary (from metadata.yml: title, description, task, input/output)
 - Test evidence (from test_report.json: all check results, verified outputs)
 - Source information (paper URL, source code URL)
 
-### 4d. Open the pull request
+### 5d. Open the pull request
 
 ```bash
 gh pr create \
@@ -272,15 +349,15 @@ EOF
 
 Replace all `<placeholders>` with actual values from `metadata.yml` and `test_report.json`. Use ✅ for passed checks and ❌ for failed ones.
 
-## Phase 5: Post-publish Verification
+## Phase 6: Post-publish Verification
 
-### 5a. Verify PR was created
+### 6a. Verify PR was created
 
 ```bash
 gh pr view --repo <org>/<model-id> --json number,url,state,title
 ```
 
-### 5b. Check CI status
+### 6b. Check CI status
 
 Wait briefly then check if the PR triggered CI workflows:
 
@@ -289,7 +366,7 @@ sleep 10
 gh pr checks --repo <org>/<model-id>
 ```
 
-### 5c. Report summary
+### 6c. Report summary
 
 ```
 ## PR Opened: <org>/<model-id>#<pr-number>
@@ -314,8 +391,8 @@ gh pr checks --repo <org>/<model-id>
 - NEVER publish with a placeholder ID (`eos0xxx`, `eos0aaa`). Always require a real model ID.
 - Always check if the repo already exists before creating.
 - Always include the test_report.json in the PR — it is the evidence of pre-publication testing.
+- Always generate a model-specific README.md in Phase 4 — the template default must be replaced before the PR is opened.
 - If checkpoint files are large (>50MB), warn about Git LFS before pushing.
 - The `--dry-run` flag should be used first to preview what will happen.
 - Do NOT modify the `.github/workflows/` directory — the CI comes pre-configured from the template.
-- Do NOT modify `README.md` — it is auto-generated by Ersilia infrastructure.
 - The PR body MUST include test results from test_report.json so reviewers can see evidence without running tests.
