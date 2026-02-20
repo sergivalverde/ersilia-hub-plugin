@@ -1,0 +1,18 @@
+{
+  "name": "ersilia-hub",
+  "version": "1.0.0",
+  "description": "Automate incorporation of ML models into the Ersilia Model Hub. Provides the /incorporate-model command and eos-template knowledge.",
+  "author": {
+    "name": "Ersilia Open Source Initiative",
+    "url": "https://ersilia.io"
+  },
+  "repository": "https://github.com/ersilia-os/ersilia",
+  "license": "GPL-3.0",
+  "keywords": [
+    "ersilia",
+    "model-hub",
+    "drug-discovery",
+    "cheminformatics",
+    "model-incorporation"
+  ]
+}
