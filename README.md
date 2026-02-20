@@ -31,15 +31,15 @@ Validates a locally generated model before publishing. Runs independently of the
 
 ### `/publish-model`
 
-Creates a new repository under `ersilia-os` from the `eos-template` and pushes the generated files:
+Creates a new repository under `ersilia-os` from the `eos-template` and opens a pull request for maintainer review:
 
-1. **Pre-publish validation** -- checks files, model ID format, GitHub permissions, and whether the repo already exists
+1. **Pre-publish validation** -- checks files, test report, model ID format, GitHub permissions, and whether the repo already exists
 2. **Create repository** -- uses `gh repo create --template ersilia-os/eos-template`
-3. **Populate** -- copies generated files, updates the model identifier, checks for large files
-4. **Push** -- commits and pushes to `main`, triggering CI workflows (S3 upload, Docker build)
-5. **Post-publish** -- verifies push, checks CI status, reports next steps
+3. **Populate on a branch** -- creates `incorporate/<model-id>` branch, copies generated files, updates the model identifier
+4. **Open PR** -- commits, pushes the branch, and opens a PR with test report evidence (check results, verified outputs) in the body
+5. **Post-publish** -- verifies PR was created, checks CI status, reports next steps for the reviewer
 
-Supports `--dry-run` to preview without making changes.
+The PR includes a summary table of all test checks and the verified model outputs so maintainers can review without running tests locally. Supports `--dry-run` to preview without making changes.
 
 ### `eos-template-knowledge` skill
 
