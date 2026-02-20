@@ -20,14 +20,14 @@ Takes a published ML model (from GitHub or Zenodo) and generates a complete eos-
 2. **Verify by Running** -- installs the model in an isolated venv and runs inference on test molecules to confirm output dimensions, types, and values
 3. **Present Verified Analysis** -- presents the analysis (confirmed by execution) and proposed metadata
 4. **Generate Files** -- creates the full eos-template directory structure with functional code and real example outputs
-5. **Validate** -- static checks plus end-to-end validation of the generated `main.py`
+5. **Test & Generate Report** -- runs inspect checks (file existence, metadata validation, column consistency, dependency pinning, syntax) and shallow checks (end-to-end run, output validation, consistency verification), then writes a `test_report.json` as evidence
 
 ### `/test-model`
 
-Validates a locally generated model before publishing. Two levels of testing:
+Validates a locally generated model before publishing. Runs independently of the ersilia CLI:
 
-1. **Pre-flight checks** (no ersilia required) -- verifies file existence, metadata vocabulary, column consistency, and Python syntax
-2. **ersilia test** (requires ersilia CLI) -- runs the full test suite (`--inspect`, `--surface`, `--shallow`, or `--deep`) using `--from_dir`
+1. **Inspect checks** -- file existence (7 mandatory files), metadata validation against ersilia vocabulary, column consistency between `run_columns.csv` and `run_output.csv`, dependency pinning in `install.yml`, Python syntax validation of `main.py`
+2. **Shallow checks** -- end-to-end execution of `main.py` on example inputs, output validation (correct rows, columns, no invalid values), and consistency verification (dual-run comparison)
 
 ### `/publish-model`
 
@@ -108,6 +108,62 @@ Then enable the plugin by adding the following to your `~/.claude/settings.json`
 | `--org <org>` | No | GitHub organization. Defaults to `ersilia-os` |
 | `--dry-run` | No | Preview actions without making changes |
 
+### Test report (`test_report.json`)
+
+Both `/incorporate-model` (Phase 5) and `/test-model` generate a `test_report.json` file in the model directory root. This file serves as evidence that the model was tested before publication and is committed alongside the model files.
+
+The report contains:
+
+```json
+{
+  "model_id": "eos0xxx",
+  "test_date": "2026-02-20T07:46:01.349338+00:00",
+  "test_tool": "ersilia-hub-plugin",
+  "test_tool_version": "1.0.0",
+  "source_repo": "https://github.com/author/model-repo",
+  "paper_url": "https://doi.org/10.1234/paper",
+  "python_version": "3.9.6",
+  "verification_environment": {
+    "packages": {
+      "package-name": "version",
+      "...": "..."
+    }
+  },
+  "inspect_checks": {
+    "file_existence":       { "status": "passed", "files_checked": 7, "files_found": 7 },
+    "metadata_validation":  { "status": "passed", "checks_passed": 22, "checks_failed": 0, "details": { "...": "..." } },
+    "column_consistency":   { "status": "passed", "num_columns": 39, "columns_match": true, "output_rows": 3, "input_rows": 3 },
+    "dependency_pinning":   { "status": "passed", "python_version": "3.10", "num_packages": 4, "all_pinned": true },
+    "syntax_validation":    { "status": "passed", "file": "model/framework/code/main.py" }
+  },
+  "shallow_checks": {
+    "end_to_end_run": { "status": "passed", "exit_code": 0, "output_rows": 3, "output_columns": 39, "values_match_expected": true, "no_invalid_values": true },
+    "consistency":    { "status": "passed", "method": "dual_run_comparison", "identical": true }
+  },
+  "verified_outputs": {
+    "input_smiles": ["CC(=O)Oc1ccccc1C(=O)O", "..."],
+    "output_values": [[0, 0, "..."], ["..."]],
+    "output_columns": ["col1", "col2", "..."]
+  },
+  "overall": {
+    "status": "passed",
+    "total_checks": 7,
+    "passed": 7,
+    "failed": 0
+  }
+}
+```
+
+| Section | Description |
+|---------|-------------|
+| `model_id` | Ersilia model identifier |
+| `test_date` | ISO 8601 timestamp of when the test was run |
+| `verification_environment` | Exact package versions used during testing (from `pip freeze`) |
+| `inspect_checks` | Static validation results: file existence, metadata against ersilia vocabulary, column consistency, dependency pinning, syntax |
+| `shallow_checks` | Runtime validation: end-to-end `main.py` execution and dual-run consistency comparison |
+| `verified_outputs` | Actual model outputs on the 3 test molecules (aspirin, ibuprofen, caffeine), used as ground truth |
+| `overall` | Aggregate pass/fail status and check counts |
+
 ### Using the knowledge base
 
 The eos-template-knowledge skill activates automatically when you ask Claude Code about incorporating models, the eos-template format, or when working inside an eosXXXX repository.
@@ -153,7 +209,7 @@ For a smoother experience, you can pre-allow common operations in your project's
 - Git
 - Python 3.9+
 - [GitHub CLI](https://cli.github.com/) (`gh`) -- for `/publish-model`
-- [Ersilia CLI](https://github.com/ersilia-os/ersilia) -- for `/test-model` full test suite (pre-flight checks work without it)
+- [Ersilia CLI](https://github.com/ersilia-os/ersilia) -- optional, the plugin runs tests independently
 
 ## License
 
