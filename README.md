@@ -42,7 +42,7 @@ Takes a published ML model (from GitHub or Zenodo) and generates a complete eos-
 
 1. **Clone & Analyze** -- clones the source repo, identifies the ML framework, dependencies, inference entry point, and input/output formats
 2. **Verify by Running** -- installs the model in an isolated venv and runs inference on test molecules to confirm output dimensions, types, and values
-3. **Present Verified Analysis** -- presents the analysis (confirmed by execution) and proposed metadata
+3. **Assign Model ID & Present Analysis** -- generates a unique model ID (checks GitHub for collisions), presents the verified analysis and proposed metadata for user confirmation
 4. **Generate Files** -- creates the full eos-template directory structure with functional code and real example outputs
 5. **Test & Generate Report** -- runs inspect checks (file existence, metadata validation, column consistency, dependency pinning, syntax) and shallow checks (end-to-end run, output validation, consistency verification), then writes a `test_report.json` as evidence
 
@@ -59,7 +59,7 @@ Creates a new repository under `ersilia-os` from the `eos-template` and opens a 
 
 1. **Pre-publish validation** -- checks files, test report, model ID format, GitHub permissions, and whether the repo already exists
 2. **Create repository** -- uses `gh repo create --template ersilia-os/eos-template`
-3. **Populate on a branch** -- creates `incorporate/<model-id>` branch, copies generated files, updates the model identifier
+3. **Populate on a branch** -- creates `incorporate/<model-id>` branch, copies generated files and test report
 4. **Open PR** -- commits, pushes the branch, and opens a PR with test report evidence (check results, verified outputs) in the body
 5. **Post-publish** -- verifies PR was created, checks CI status, reports next steps for the reviewer
 
@@ -121,7 +121,7 @@ Then enable the plugin by adding the following to your `~/.claude/settings.json`
 | Argument | Required | Description |
 |----------|----------|-------------|
 | `<model-dir>` | Yes | Path to the local eos-template model directory |
-| `--level <level>` | No | Test depth: `inspect`, `surface`, `shallow` (default), or `deep` |
+| `--level <level>` | No | Test depth: `inspect` or `shallow` (default) |
 
 #### `/publish-model`
 
@@ -139,7 +139,7 @@ The report contains:
 
 ```json
 {
-  "model_id": "eos0xxx",
+  "model_id": "eos7k2f",
   "test_date": "2026-02-20T07:46:01.349338+00:00",
   "test_tool": "ersilia-hub-plugin",
   "test_tool_version": "1.0.0",
@@ -219,8 +219,9 @@ For a smoother experience, you can pre-allow common operations in your project's
       "Bash(python3:*)",
       "Bash(gh repo create:*)",
       "Bash(gh repo view:*)",
-      "Bash(gh run list:*)",
-      "Bash(ersilia:*)"
+      "Bash(gh api:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh run list:*)"
     ]
   }
 }
@@ -231,8 +232,7 @@ For a smoother experience, you can pre-allow common operations in your project's
 - [Claude Code](https://claude.com/claude-code) CLI
 - Git
 - Python 3.9+
-- [GitHub CLI](https://cli.github.com/) (`gh`) -- for `/publish-model`
-- [Ersilia CLI](https://github.com/ersilia-os/ersilia) -- optional, the plugin runs tests independently
+- [GitHub CLI](https://cli.github.com/) (`gh`) -- for model ID generation and `/publish-model`
 
 ## License
 
