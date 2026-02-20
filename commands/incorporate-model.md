@@ -178,51 +178,152 @@ Use ONLY values from the valid vocabulary lists in the eos-template-knowledge sk
 - `model/framework/examples/run_output.csv`: Use the ACTUAL outputs recorded during verification (Phase 2d). Never use placeholder values.
 - `model/framework/columns/run_columns.csv`: column metadata with name, type, direction, description
 
-## Phase 5: Validate
+## Phase 5: Test and Generate Report
 
-### 5a. Static validation
+This phase runs the same checks as `/test-model --level shallow` and saves a test report file in the model directory as evidence. This report is committed alongside the model files when published.
 
-1. Verify all 7 required files exist:
-   - model/framework/code/main.py
-   - model/framework/run.sh
-   - model/framework/examples/run_input.csv
-   - model/framework/examples/run_output.csv
-   - model/framework/columns/run_columns.csv
-   - install.yml
-   - metadata.yml
+### 5a. Run all inspect checks
 
-2. Verify main.py is syntactically valid:
+Using the verification venv from Phase 2, run these checks programmatically and collect results as a list of `(check_name, status, detail)` tuples:
+
+**File existence** — verify all 7 mandatory files exist.
+
+**Metadata validation** — validate each pre-publish field against the same rules used by `ersilia test` (from `BaseInformationValidator`):
+
+| Field | Rule |
+|-------|------|
+| Identifier | Pattern `eos[0-9][a-z0-9]{3}` |
+| Slug | Lowercase, 5-60 chars |
+| Status | Valid vocabulary |
+| Title | 10-300 chars |
+| Description | >= 200 chars |
+| Task, Subtask, Input, Output, Output Consistency | Valid vocabulary |
+| Input Dimension, Output Dimension | Integer >= 1 |
+| Interpretation | 10-300 chars |
+| Tag, Biomedical Area, Target Organism | Valid vocabulary lists |
+| Source, Source Type | Valid vocabulary |
+| Publication, Source Code | Valid URL or empty |
+| License, Publication Type | Valid vocabulary |
+
+Skip post-deployment fields (Contributor, DockerHub, S3, Docker Architecture, Image Size, etc.).
+
+**Column consistency** — verify run_columns.csv names match run_output.csv headers, 3 rows each, no smiles/input/key in output.
+
+**Dependency pinning** — verify install.yml has valid Python version and all deps pinned.
+
+**Syntax** — verify main.py parses as valid Python.
+
+### 5b. Run end-to-end checks
+
+Using the verification venv from Phase 2:
+
+1. **Run main.py** on the example input:
+   ```bash
+   /tmp/ersilia-verify-<model-id>/bin/python3 <path>/model/framework/code/main.py \
+       <path>/model/framework/examples/run_input.csv \
+       /tmp/ersilia-test-output-<model-id>.csv
    ```
-   python -c "import ast; ast.parse(open('<path>/model/framework/code/main.py').read())"
-   ```
 
-3. Verify metadata.yml is valid YAML:
-   ```
-   python -c "import yaml; yaml.safe_load(open('<path>/metadata.yml'))"
-   ```
+2. **Validate output**: file exists, 3 rows, headers match run_columns.csv, values match run_output.csv, no invalid values (NaN/None/null).
 
-### 5b. End-to-end validation
-
-Run the generated main.py against the example input to confirm it produces correct output:
-
-```bash
-/tmp/ersilia-verify-<model-id>/bin/python3 <path>/model/framework/code/main.py \
-    <path>/model/framework/examples/run_input.csv \
-    /tmp/ersilia-test-output-<model-id>.csv
-```
-
-Then verify:
-1. The output file was created
-2. It has the correct number of rows (3, matching input)
-3. It has the correct column headers (matching run_columns.csv)
-4. The values match the verified outputs from Phase 2d
-5. No input/SMILES column appears in the output
+3. **Consistency check**: run main.py a second time, compare outputs — must be identical for Fixed output consistency.
 
 If end-to-end validation fails, fix the generated code and re-run until it passes.
 
-### 5c. Report summary
+### 5c. Generate test report
 
-Report a summary listing all generated files with their paths and sizes, plus confirmation that end-to-end validation passed.
+Write a `test_report.json` file in the model directory root (`<output-dir>/<model-id>/test_report.json`). This file serves as evidence that the model was tested before publication.
+
+The report must contain:
+
+```json
+{
+  "model_id": "<model-id>",
+  "test_date": "<ISO 8601 timestamp>",
+  "test_tool": "ersilia-hub-plugin",
+  "test_tool_version": "1.0.0",
+  "source_repo": "<repo-url>",
+  "paper_url": "<paper-url or null>",
+  "python_version": "<python version used in test venv>",
+  "verification_environment": {
+    "packages": {
+      "<package>": "<version>",
+      ...
+    }
+  },
+  "inspect_checks": {
+    "file_existence": {
+      "status": "passed",
+      "files_checked": 7,
+      "files_found": 7
+    },
+    "metadata_validation": {
+      "status": "passed",
+      "checks_passed": <N>,
+      "checks_failed": 0,
+      "details": {
+        "<field>": {"status": "passed", "value": "<value>"},
+        ...
+      }
+    },
+    "column_consistency": {
+      "status": "passed",
+      "num_columns": <N>,
+      "columns_match": true,
+      "output_rows": 3,
+      "input_rows": 3
+    },
+    "dependency_pinning": {
+      "status": "passed",
+      "python_version": "<version>",
+      "num_packages": <N>,
+      "all_pinned": true
+    },
+    "syntax_validation": {
+      "status": "passed",
+      "file": "model/framework/code/main.py"
+    }
+  },
+  "shallow_checks": {
+    "end_to_end_run": {
+      "status": "passed",
+      "exit_code": 0,
+      "output_rows": 3,
+      "output_columns": <N>,
+      "values_match_expected": true,
+      "no_invalid_values": true
+    },
+    "consistency": {
+      "status": "passed",
+      "method": "dual_run_comparison",
+      "identical": true
+    }
+  },
+  "verified_outputs": {
+    "input_smiles": [
+      "CC(=O)Oc1ccccc1C(=O)O",
+      "CC(C)Cc1ccc(cc1)C(C)C(=O)O",
+      "Cn1c(=O)c2c(ncn2C)n(c1=O)C"
+    ],
+    "output_values": [
+      [<row 1 values>],
+      [<row 2 values>],
+      [<row 3 values>]
+    ],
+    "output_columns": ["<col1>", "<col2>", ...]
+  },
+  "overall": {
+    "status": "passed",
+    "total_checks": <N>,
+    "passed": <N>,
+    "failed": 0
+  }
+}
+```
+
+### 5d. Report summary
+
+Display a summary table to the user showing all check results, plus confirmation that `test_report.json` was generated. List all generated files with their paths and sizes.
 
 ## Important Rules
 
