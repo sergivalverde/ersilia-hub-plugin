@@ -281,7 +281,63 @@ Using the verification venv from Phase 2, run the three deep validation sub-chec
 
 Collect all deep check results into a `deep_checks` dictionary.
 
-### 5d. Generate test report
+### 5d. Generate deep validation notebook
+
+Generate an **executed** Jupyter notebook (`deep_validation.ipynb`) in the model directory root. This notebook is committed alongside the model files as a visual, interactive report of the deep validation results.
+
+**Step 1 — Install notebook dependencies in the verification venv:**
+```bash
+/tmp/ersilia-verify-<model-id>/bin/pip install matplotlib seaborn pandas ipykernel nbconvert jupyter_client
+/tmp/ersilia-verify-<model-id>/bin/python3 -m ipykernel install --user --name <model-id>-validation --display-name "Python (<model-id>)"
+```
+
+**Step 2 — Generate the notebook source:**
+
+Write a `deep_validation.ipynb` file with these sections:
+
+1. **Setup cell**: Import the model's inference library directly (not via subprocess). Import numpy, pandas, matplotlib, seaborn. Define a `run_model(smiles_list)` function that calls the model inline and returns a DataFrame + elapsed time. Define `cosine_similarity(a, b)`.
+
+2. **Section 1 — Distribution Analysis**:
+   - Run DIVERSE_50 molecules (from eos-template-knowledge skill)
+   - Print completion rate, varying/constant columns, runtime
+   - Fingerprint/output heatmap (molecules x columns, only varying columns)
+   - Per-column mean/std bar chart
+   - Pairwise cosine similarity histogram + heatmap (for Representation models) OR output value histogram (for Annotation models)
+
+3. **Section 2 — Sanity Checks**:
+   - Run the matched sanity compounds from SANITY_COMPOUNDS
+   - For fingerprint models: compare similar_pair vs dissimilar_pair cosine similarity with side-by-side bar charts
+   - For annotation models: compare positive vs negative group means with bar charts showing directional separation
+
+4. **Section 3 — Paper Reproduction** (if paper URL available):
+   - Run the paper-specific validation (e.g., within-class vs between-class similarity for fingerprints, metric comparison for classifiers)
+   - Visualization appropriate to the validation method (histograms, boxplots, similarity matrices)
+   - If no paper reproduction data available, show a "Skipped" note
+
+5. **Section 4 — Summary**:
+   - Results table (Check, Status, Details)
+   - JSON export matching the `deep_checks` schema for test_report.json
+
+**Step 3 — Execute the notebook:**
+```bash
+/tmp/ersilia-verify-<model-id>/bin/jupyter nbconvert \
+    --to notebook --execute \
+    --ExecutePreprocessor.kernel_name=<model-id>-validation \
+    --ExecutePreprocessor.timeout=600 \
+    --output deep_validation.ipynb \
+    <output-dir>/<model-id>/deep_validation.ipynb
+```
+
+This overwrites the source notebook with the executed version containing all outputs and plots inline. The executed notebook is what gets committed to the repo.
+
+**Step 4 — Clean up kernel registration:**
+```bash
+jupyter kernelspec remove <model-id>-validation -f 2>/dev/null || true
+```
+
+If notebook execution fails, still include the un-executed notebook and note the failure in the test report. The notebook is supplementary — the test_report.json is the primary evidence.
+
+### 5e. Generate test report
 
 Write a `test_report.json` file in the model directory root (`<output-dir>/<model-id>/test_report.json`). This file serves as evidence that the model was tested before publication.
 
@@ -416,9 +472,9 @@ The report must contain:
 }
 ```
 
-### 5e. Report summary
+### 5f. Report summary
 
-Display a summary table to the user showing all check results (inspect, shallow, and deep), plus confirmation that `test_report.json` was generated. List all generated files with their paths and sizes.
+Display a summary table to the user showing all check results (inspect, shallow, and deep), plus confirmation that `test_report.json` and `deep_validation.ipynb` were generated. List all generated files with their paths and sizes. Note whether the notebook was executed successfully (outputs visible in repo).
 
 ## Important Rules
 

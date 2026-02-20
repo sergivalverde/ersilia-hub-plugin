@@ -195,6 +195,17 @@ The report contains:
 | `verified_outputs` | Actual model outputs on the 3 test molecules (aspirin, ibuprofen, caffeine), used as ground truth |
 | `overall` | Aggregate pass/fail/warning status and check counts |
 
+### Deep validation notebook (`deep_validation.ipynb`)
+
+When `/incorporate-model` or `/test-model --level deep` runs deep checks, it also generates an **executed** Jupyter notebook in the model directory. This notebook contains:
+
+- Interactive heatmaps and bar charts of the distribution analysis
+- Side-by-side fingerprint comparisons for sanity checks
+- Similarity matrices and boxplots for paper reproduction
+- A summary table with pass/fail status for each check
+
+The notebook is committed to the repo with all outputs pre-rendered, so reviewers can see the visual validation results directly on GitHub without running any code. It uses the model's inference library inline (not subprocess), making it easy to re-run interactively in VSCode or JupyterLab.
+
 ### Using the knowledge base
 
 The eos-template-knowledge skill activates automatically when you ask Claude Code about incorporating models, the eos-template format, or when working inside an eosXXXX repository.

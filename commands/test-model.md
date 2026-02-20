@@ -313,7 +313,48 @@ If `Source Code` URL points to a GitHub repo:
 | Paper fetched but no metrics found | skipped |
 | No test data available | skipped |
 
-After all deep checks, if `--level deep` was requested, now clean up the venv:
+### 3e. Generate deep validation notebook
+
+When `--level deep`, generate an **executed** Jupyter notebook (`deep_validation.ipynb`) in the model directory. This notebook provides an interactive, visual report of all deep validation results with plots and tables.
+
+**Step 1 — Install notebook dependencies in the test venv:**
+```bash
+/tmp/ersilia-test-<model-id>/bin/pip install matplotlib seaborn pandas ipykernel nbconvert jupyter_client
+/tmp/ersilia-test-<model-id>/bin/python3 -m ipykernel install --user --name <model-id>-validation --display-name "Python (<model-id>)"
+```
+
+**Step 2 — Generate the notebook source:**
+
+Write a `deep_validation.ipynb` file in `<model-dir>/` with these sections:
+
+1. **Setup**: Import the model's inference library directly (inline, not subprocess). Define `run_model(smiles_list)` returning DataFrame + elapsed time. Define `cosine_similarity(a, b)`.
+
+2. **Distribution Analysis**: Run DIVERSE_50 molecules, show completion stats, fingerprint/output heatmap (varying columns only), per-column mean/std bar chart, pairwise similarity histogram + heatmap.
+
+3. **Sanity Checks**: Run matched sanity compounds. For fingerprint models: similar vs dissimilar pair cosine similarity with side-by-side bar charts. For annotation models: positive vs negative group means with directional bar charts.
+
+4. **Paper Reproduction** (if applicable): Run paper-specific validation with appropriate visualizations (similarity matrices, boxplots, metric comparisons). Show "Skipped" if no paper data.
+
+5. **Summary**: Results table + JSON export matching `deep_checks` schema.
+
+**Step 3 — Execute the notebook:**
+```bash
+/tmp/ersilia-test-<model-id>/bin/jupyter nbconvert \
+    --to notebook --execute \
+    --ExecutePreprocessor.kernel_name=<model-id>-validation \
+    --ExecutePreprocessor.timeout=600 \
+    --output deep_validation.ipynb \
+    <model-dir>/deep_validation.ipynb
+```
+
+This overwrites the notebook with the executed version containing all outputs and plots. If execution fails, keep the un-executed notebook and note the failure.
+
+**Step 4 — Clean up kernel:**
+```bash
+jupyter kernelspec remove <model-id>-validation -f 2>/dev/null || true
+```
+
+After deep checks and notebook generation, clean up the venv:
 
 ```bash
 rm -rf /tmp/ersilia-test-<model-id> /tmp/ersilia-test-output-<model-id>*.csv /tmp/deep-*.csv
@@ -364,9 +405,11 @@ Overall: PASS (X/Y checks passed, W warnings)
 For any failed checks, explain what went wrong and suggest fixes.
 For warnings (especially from paper reproduction), explain what was checked and why it was inconclusive.
 
+If `--level deep` was used, also note whether `deep_validation.ipynb` was generated and executed successfully. The notebook contains interactive plots that can be viewed in the model repository.
+
 ## Important Rules
 
-- Never modify the model files during testing. This command is read-only.
+- The only file this command writes to the model directory is `deep_validation.ipynb` (when `--level deep`). All other model files are read-only.
 - The end-to-end run uses main.py directly — it does NOT require ersilia CLI, conda, or Docker.
 - Skip post-deployment metadata fields (Contributor, DockerHub, S3, etc.) — those are filled after publish.
 - If environment setup fails, report the error but still report all inspect-level results.

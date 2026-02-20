@@ -143,6 +143,11 @@ cp <model-dir>/metadata.yml <model-id>/metadata.yml
 cp <model-dir>/test_report.json <model-id>/test_report.json
 ```
 
+If `<model-dir>/deep_validation.ipynb` exists, copy it too:
+```bash
+cp <model-dir>/deep_validation.ipynb <model-id>/deep_validation.ipynb
+```
+
 If there are checkpoint files in `<model-dir>/model/checkpoints/`, copy those too:
 ```bash
 cp -r <model-dir>/model/checkpoints/* <model-id>/model/checkpoints/
@@ -245,6 +250,7 @@ All checks were run locally using `ersilia-hub-plugin` before submission.
 | <smiles3> | <first 5 values> |
 
 Full test report is included as `test_report.json` in this PR.
+Deep validation notebook with interactive plots: `deep_validation.ipynb` (view on GitHub for rendered outputs).
 
 ---
 🤖 Automated by [ersilia-hub-plugin](https://github.com/sergivalverde/ersilia-hub-plugin)
