@@ -241,6 +241,18 @@ All checks were run locally using `ersilia-hub-plugin` before submission.
 | Sanity (<category>) | ✅ passed | <positive_mean> vs <negative_mean> (correct separation) |
 | Paper reproduction | ⚠️ skipped | <detail> |
 
+#### Scientific Validation Analysis
+
+Write a 2-3 paragraph narrative section here that explains:
+
+1. **What was tested and why**: Describe the deep validation approach used for this specific model — what compounds were run, what properties were measured, and what the expected behavior is based on the paper's claims.
+
+2. **Results obtained**: Report the key quantitative results — distribution statistics (completion rate, number of varying dimensions, runtime), sanity check metrics (similarity scores, separation ratios, directional correctness), and paper reproduction metrics (within/between-class similarity, metric deviation from paper). Include specific numbers.
+
+3. **Correlation with the original paper**: Explain how the results confirm or deviate from the paper's claims. Reference the paper's key finding and show how the model's behavior on the test set aligns with it. If there are warnings or deviations, explain why they are acceptable (e.g., sparse fingerprints naturally have constant dimensions, wrapping may differ from the paper's exact pipeline).
+
+This section should be model-specific and written in plain scientific language so a reviewer can understand the validation without opening the notebook.
+
 ### Verified Outputs (3 test molecules)
 
 | SMILES | Output (first 5 values...) |
@@ -249,8 +261,8 @@ All checks were run locally using `ersilia-hub-plugin` before submission.
 | <smiles2> | <first 5 values> |
 | <smiles3> | <first 5 values> |
 
-Full test report is included as `test_report.json` in this PR.
-Deep validation notebook with interactive plots: `deep_validation.ipynb` (view on GitHub for rendered outputs).
+Full test report: [`test_report.json`](test_report.json)
+Deep validation notebook with interactive plots: [`deep_validation.ipynb`](deep_validation.ipynb)
 
 ---
 🤖 Automated by [ersilia-hub-plugin](https://github.com/sergivalverde/ersilia-hub-plugin)
