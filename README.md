@@ -2,14 +2,38 @@
 
 A [Claude Code](https://claude.com/claude-code) plugin that automates the end-to-end incorporation of published ML models into the [Ersilia Model Hub](https://ersilia.io) -- from source code analysis to repository creation.
 
+## Workflow
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                       /incorporate-model <url>                          │
+│                                                                         │
+│   Paper + Code ──> Analyze ──> Verify by ──> Assign ID ──> Generate    │
+│                     source      Running      (eos7k2f)    eos-template  │
+│                                  model                        |         │
+│                                                         Test & Report   │
+│                                                        test_report.json │
+└───────────────────────────────────────────────────────────────┬─────────┘
+                                                                |
+                                              ┌─────────────────┘
+                                              v
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      /publish-model <dir>                               │
+│                                                                         │
+│   eos-template ──> Create repo ──> Open PR ──> Maintainer ──> CI Deploy │
+│   + test_report   on ersilia-os   with test    reviews &     S3+Docker  │
+│                                   evidence     merges                   │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
 ## What it does
 
 This plugin provides three commands and a knowledge base that cover the full model incorporation workflow:
 
 ```
-/incorporate-model <url>    →  analyze source, verify by running, generate eos-template files
-/test-model <model-dir>     →  validate files and run ersilia test locally
-/publish-model <id> <dir>   →  create repo under ersilia-os, push, trigger CI
+/incorporate-model <url>    ->  analyze, verify, assign ID, generate eos-template + test report
+/test-model <model-dir>     ->  validate files and run checks locally (standalone)
+/publish-model <model-dir>  ->  create repo under ersilia-os, open PR with test evidence
 ```
 
 ### `/incorporate-model`
