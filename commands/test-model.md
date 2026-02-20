@@ -1,6 +1,6 @@
 ---
 description: Run local tests on an eos-template model before publishing
-argument-hint: <model-dir> [--level inspect|surface|shallow|deep]
+argument-hint: <model-dir> [--level inspect|shallow]
 allowed-tools: [Bash, Read, Glob, Grep, Task, TodoWrite, AskUserQuestion]
 ---
 
@@ -8,19 +8,21 @@ allowed-tools: [Bash, Read, Glob, Grep, Task, TodoWrite, AskUserQuestion]
 
 You are testing a locally generated eos-template model to validate it before publishing to the Ersilia Model Hub.
 
+This command reimplements the relevant checks from `ersilia test` directly, without requiring the ersilia CLI or online model ID validation. This allows testing models with placeholder IDs (like `eos0xxx`) before they are published.
+
 ## Parse Arguments
 
 From the user's input, extract:
 - `model-dir` (required): Path to the local eos-template model directory (e.g., `./eos0xxx`)
-- `--level <level>` (optional): Test depth. One of `inspect`, `surface`, `shallow`, `deep`. Default: `shallow`
+- `--level <level>` (optional): Test depth. `inspect` (metadata + files only) or `shallow` (inspect + end-to-end run). Default: `shallow`
 
-## Phase 1: Pre-flight Checks
+## Phase 1: Inspect Checks
 
-Before running ersilia test, perform quick local validation:
+These mirror the "basic" checks from `ersilia test --inspect`.
 
-### 1a. Verify required files exist
+### 1a. File existence
 
-Check that all 7 mandatory files are present:
+Check that all mandatory files are present:
 ```
 model/framework/code/main.py
 model/framework/run.sh
@@ -31,118 +33,171 @@ install.yml
 metadata.yml
 ```
 
-If any are missing, report the missing files and stop.
+Report each file as PASS/FAIL. If any are missing, stop.
 
-### 1b. Validate metadata.yml
+### 1b. Metadata validation
 
-Read `metadata.yml` and check:
-1. **Identifier** matches the directory name (e.g., `eos0xxx`)
-2. **Title** is between 10 and 300 characters
-3. **Description** is at least 200 characters and differs from Title
-4. **Interpretation** is between 10 and 300 characters
-5. **Task** is one of: Representation, Annotation, Sampling
-6. **Subtask** is one of: Featurization, Projection, Property calculation or prediction, Activity prediction, Similarity search, Generation
-7. **Input** is one of: Compound, Protein, Text
-8. **Output** is one of: Compound, Score, Value, Text
-9. **Output Consistency** is one of: Fixed, Variable
-10. **Publication** is a valid URL
-11. **Source Code** is a valid URL
-12. **License** is a valid SPDX identifier from the eos-template-knowledge skill vocabulary
+Read `metadata.yml` and validate each field against the same rules used by `ersilia test` (from `BaseInformationValidator`):
 
-Report any validation errors and ask the user if they want to fix them before continuing.
+**Required pre-publish fields** (check all of these):
 
-### 1c. Validate column consistency
+| Field | Validation Rule |
+|-------|----------------|
+| Identifier | Matches pattern `eos[0-9][a-z0-9]{3}` |
+| Slug | Lowercase, 5-60 characters |
+| Status | One of: Test, In maintenance, In progress, Ready, Archived |
+| Title | 10-300 characters |
+| Description | At least 200 characters, non-empty |
+| Task | One of: Representation, Annotation, Sampling |
+| Subtask | One of: Featurization, Projection, Property calculation or prediction, Activity prediction, Similarity search, Generation |
+| Input | Each value one of: Compound, Protein, Text |
+| Input Dimension | Integer >= 1 |
+| Output | Each value one of: Compound, Score, Value, Text |
+| Output Dimension | Integer >= 1 |
+| Output Consistency | One of: Fixed, Variable |
+| Interpretation | 10-300 characters |
+| Tag | Each value from the valid Tag vocabulary (see eos-template-knowledge skill) |
+| Biomedical Area | Each value from the valid Biomedical Area vocabulary |
+| Target Organism | Each value from the valid Target Organism vocabulary |
+| Source | One of: Local, Online |
+| Source Type | One of: External, Replicated, Internal |
+| Publication | Valid URL or empty |
+| Source Code | Valid URL or empty |
+| License | Valid SPDX identifier from the vocabulary |
+| Publication Type | One of: Peer reviewed, Preprint, Other |
 
-1. Read `model/framework/columns/run_columns.csv` and extract column names
-2. Read `model/framework/examples/run_output.csv` and extract header columns
-3. Verify they match exactly (same names, same order)
-4. Verify `run_output.csv` has exactly 3 data rows (matching the 3 input SMILES)
-5. Verify no `smiles` or `input` column appears in the output
+**Post-deployment fields** (skip these — they are filled after publish):
+Contributor, DockerHub, S3, Docker Architecture, Image Size, Environment Size, Model Size, Computational Performance, Incorporation Date, Release, Last Packaging Date.
 
-### 1d. Validate main.py syntax
+Report each field check as PASS/FAIL.
 
+### 1c. Column and output consistency
+
+1. Read `model/framework/columns/run_columns.csv` — extract the `name` column (skip header row, take first column of each data row)
+2. Read `model/framework/examples/run_output.csv` — extract header columns
+3. Verify they match exactly (same names, same order, same count)
+4. Verify `run_output.csv` has exactly 3 data rows
+5. Verify `run_input.csv` has exactly 3 data rows with header `smiles`
+6. Verify no `smiles`, `input`, or `key` column appears in the output headers
+
+### 1d. Dependency pinning check
+
+Read `install.yml` and verify:
+1. Python version is specified and is one of: 3.8, 3.9, 3.10, 3.11, 3.12
+2. Every pip/conda dependency has a pinned version (not unpinned)
+3. The file is valid YAML
+
+### 1e. Syntax validation
+
+Verify `main.py` is syntactically valid Python:
 ```bash
 python3 -c "import ast; ast.parse(open('<model-dir>/model/framework/code/main.py').read())"
 ```
 
-Report results for all pre-flight checks. If there are failures, ask the user whether to continue or stop to fix.
+### 1f. Directory size
 
-## Phase 2: Run ersilia test
+Report the total size of the model directory and flag any files > 50MB (Git LFS warning).
 
-### 2a. Ensure ersilia is installed
+After all inspect checks, report a summary table. If `--level inspect`, stop here.
 
-Check if ersilia is available:
+## Phase 2: Shallow Checks (end-to-end run)
 
-```bash
-ersilia --version
-```
+These mirror the "surface" and "shallow" checks from `ersilia test`, but run main.py directly via bash instead of going through `ersilia fetch/serve/run`.
 
-If ersilia is NOT installed, install it automatically in the current Python environment:
+### 2a. Set up test environment
 
-```bash
-pip install ersilia[test]
-```
-
-If pip install fails (e.g., due to system Python restrictions), try with a virtual environment:
+Create an isolated virtual environment and install the model's dependencies:
 
 ```bash
-python3 -m venv /tmp/ersilia-test-env
-/tmp/ersilia-test-env/bin/pip install ersilia[test]
+python3 -m venv /tmp/ersilia-test-<model-id>
 ```
 
-Then use `/tmp/ersilia-test-env/bin/ersilia` for all subsequent commands.
+Read `install.yml` and install dependencies:
+- For pip entries `["pip", "package", "version"]`: run `/tmp/ersilia-test-<model-id>/bin/pip install package==version`
+- For pip entries with index URL: add `--index-url <url>`
+- For pip entries with git URL: run `/tmp/ersilia-test-<model-id>/bin/pip install git+<url>`
+- For conda entries: warn that conda dependencies need manual setup, but try pip alternatives first (e.g., `rdkit` is pip-installable)
+- For string commands: run them in the venv
 
-Verify the installation succeeded:
+### 2b. Run main.py on example input
+
+Execute main.py directly, bypassing ersilia serve:
 
 ```bash
-ersilia --version
+/tmp/ersilia-test-<model-id>/bin/python3 <model-dir>/model/framework/code/main.py \
+    <model-dir>/model/framework/examples/run_input.csv \
+    /tmp/ersilia-test-output-<model-id>.csv
 ```
 
-If installation still fails, report the error to the user and stop. Do NOT skip the ersilia test suite — it is a required part of validation.
+### 2c. Validate output
 
-### 2b. Run the test
+1. **Output file exists**: Verify `/tmp/ersilia-test-output-<model-id>.csv` was created
+2. **Row count**: Verify output has exactly 3 data rows (matching 3 input SMILES)
+3. **Column headers match**: Verify output headers match `run_columns.csv` names
+4. **No input columns**: Verify no `smiles`, `input`, or `key` column in output
+5. **Values match example**: Compare output against `run_output.csv` — for Fixed consistency, values must match exactly
+6. **No invalid values**: Check for NaN, None, null, empty strings in output
 
-Run ersilia test at the requested level using `--from_dir`:
+### 2d. Consistency check (Fixed output only)
+
+If `Output Consistency` is "Fixed", run main.py a second time and verify outputs are identical:
 
 ```bash
-ersilia -v test <model-id> --<level> --from_dir <model-dir> --report_path /tmp/ersilia-test-reports
+/tmp/ersilia-test-<model-id>/bin/python3 <model-dir>/model/framework/code/main.py \
+    <model-dir>/model/framework/examples/run_input.csv \
+    /tmp/ersilia-test-output-<model-id>-run2.csv
 ```
 
-Where `<model-id>` is extracted from the directory name or `metadata.yml` Identifier field.
+Compare both outputs:
+- For numeric columns: RMSE must be < 10%
+- For string columns: fuzzy match >= 95%
+- Report as PASS/FAIL
 
-### 2c. Parse and report results
+### 2e. Cleanup
 
-1. Read the JSON report at `/tmp/ersilia-test-reports/<model-id>-test.json`
-2. Present results in a clear table:
+```bash
+rm -rf /tmp/ersilia-test-<model-id> /tmp/ersilia-test-output-<model-id>*.csv
+```
+
+## Phase 3: Report
+
+Present all results in a clear summary:
 
 ```
 ## Test Results: <model-id>
 
-| Check | Result |
-|-------|--------|
-| Metadata validation | PASS/FAIL |
-| File structure | PASS/FAIL |
-| Model fetch | PASS/FAIL |
-| Model run | PASS/FAIL |
-| Output consistency | PASS/FAIL |
-| ... | ... |
+### Inspect Checks
+| Check | Result | Details |
+|-------|--------|---------|
+| File: main.py | PASS | exists |
+| File: run.sh | PASS | exists |
+| ... | ... | ... |
+| Metadata: Identifier | PASS | eos0xxx |
+| Metadata: Title | PASS | 54 chars |
+| ... | ... | ... |
+| Columns match | PASS | 39 columns |
+| Dependencies pinned | PASS | 4 packages |
+| Syntax: main.py | PASS | valid Python |
 
-Overall: PASS / FAIL (X of Y checks passed)
+### Shallow Checks
+| Check | Result | Details |
+|-------|--------|---------|
+| Environment setup | PASS | venv created |
+| main.py execution | PASS | completed |
+| Output rows | PASS | 3 rows |
+| Output columns | PASS | match run_columns.csv |
+| Output values | PASS | match run_output.csv |
+| Consistency | PASS | identical on re-run |
+
+Overall: PASS (X/Y checks passed)
 ```
 
-3. For any failed checks, explain what went wrong and suggest fixes.
-
-## Phase 3: Cleanup
-
-After reporting results, clean up the test artifacts:
-
-```bash
-ersilia delete <model-id> 2>/dev/null
-```
+For any failed checks, explain what went wrong and suggest fixes.
 
 ## Important Rules
 
-- Always run pre-flight checks first — they catch common issues faster than the full ersilia test suite.
-- If pre-flight checks fail, the user should fix issues before running the full test.
 - Never modify the model files during testing. This command is read-only.
-- If ersilia is not installed, the pre-flight checks alone still provide value — report them and stop gracefully.
+- The end-to-end run uses main.py directly — it does NOT require ersilia CLI, conda, or Docker.
+- Skip post-deployment metadata fields (Contributor, DockerHub, S3, etc.) — those are filled after publish.
+- If environment setup fails, report the error but still report all inspect-level results.
+- Always clean up test artifacts when done.
